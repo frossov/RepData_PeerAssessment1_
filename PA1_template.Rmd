@@ -1,0 +1,123 @@
+Peer-graded Assignment: Course Project 1
+================================================
+##Introduction
+
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the “quantified self” movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+The variables included in this dataset are:
+
+steps: Number of steps taking in a 5-minute interval (missing values are coded as NAs)
+date: The date on which the measurement was taken in YYYY-MM-DD format
+interval: Identifier for the 5-minute interval in which measurement was taken
+The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
+
+##Load and read the data
+
+```{r loading, echo=TRUE}
+fileurl = 'https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip'
+if (!file.exists('./Activity monitoring.zip')){
+  download.file(fileurl,'./Activity monitoring.zip', mode = 'wb')
+  unzip("Activity monitoring.zip", exdir = getwd())
+}
+activity.data<-read.csv('./activity.csv', header = TRUE, sep = ",")
+```
+
+##Fix the date
+```{r fixdate, echo=TRUE}
+activity.data$date <- as.Date(activity.data$date, "%Y-%m-%d")
+```
+
+##Data overview
+```{r dataoverview, echo=TRUE}
+str(activity.data)
+head(activity.data)
+sum(is.na(activity.data))
+```
+
+##Histogram of the total number of steps taken each day
+For this step we need to create a histogram. We will use the Basic R commands. Every 
+```{r totalsteps, echo=TRUE}
+
+totalsteps <- aggregate(steps ~ date, data = activity.data, sum, na.rm = TRUE)
+
+hist(totalsteps$steps,col="red",main="Steps per day",xlab="Steps",cex.axis=1,cex.lab = 1, breaks = 10)
+```
+
+##Mean and median number of steps taken each day
+```{r meanandmedian, echo=TRUE}
+meansteps <- mean(totalsteps$steps)
+meansteps
+mediansteps <- median(totalsteps$steps)
+mediansteps
+```
+
+##Time series plot of the average number of steps taken
+```{r timeplot, echo=TRUE}
+stepsinterval <- aggregate(steps ~ interval, data = activity.data, mean, na.rm = TRUE)
+plot(steps ~ interval, data = stepsinterval, type = "l", xlab = "Time Intervals (5-minute)", ylab = "Mean number of steps taken (all Days)", main = "Average number of steps Taken at 5 minute Intervals",  col = "red")
+```
+
+##The 5-minute interval that, on average, contains the maximum number of steps
+```{r maxstepinterval, echo=TRUE}
+maxstepinterval <- stepsinterval[which.max(stepsinterval$steps),"interval"]
+maxstepinterval
+```
+
+##Code to describe and show a strategy for imputing missing data
+We already know from the small overview that there are 2304 missing NAs.
+```{r missingvalues, echo=TRUE}
+missingrows <- sum(!complete.cases(activity.data))
+missingrows
+```
+In addition we can confirm that the incomplete cases are 2304.
+
+Due to the missing values, there should be some code to fill them. The fist part returns the mean steps for a given interval whereas the second part fills the missing values with the mean for that 5-minute interval.
+
+```{r fixmissings, echo=TRUE}
+meanstepsrerinterval <- function(interval){
+    stepsinterval[stepsinterval$interval==interval,"steps"]
+}
+
+complete.activity.data <- activity.data
+
+flag = 0
+for (i in 1:nrow(complete.activity.data)) {
+    if (is.na(complete.activity.data[i,"steps"])) {
+        complete.activity.data[i,"steps"]<- meanstepsrerinterval(complete.activity.data[i,"interval"])
+        flag = flag + 1
+        }
+    }
+
+sum(is.na(complete.activity.data))
+```
+
+##Histogram of the total number of steps taken each day after missing values are imputed
+```{r histogramstepsperday, echo=TRUE}
+totalstepsperdays <- aggregate(steps ~ date, data = complete.activity.data, sum)
+hist(totalstepsperdays$steps, col = "red", xlab = "Total Number of Steps", 
+     ylab = "Frequency", main = "Histogram of Total Number of Steps taken each Day", breaks = 10)
+```
+
+```{r newmeanandmedian, echo=TRUE}
+newmean <- mean(totalstepsperdays$steps)
+newmean
+newmedian <- median(totalstepsperdays$steps)
+newmedian
+```
+The median now is higher. Previously was 10765. The mean is the same.
+
+##Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+```{r}
+complete.activity.data$day <- ifelse(as.POSIXlt(as.Date(complete.activity.data$date))$wday%%6 == 
+                                    0, "weekend", "weekday")
+
+complete.activity.data$day <- factor(complete.activity.data$day, levels = c("weekday", "weekend"))
+
+stepsinterval= aggregate(steps ~ interval + day, complete.activity.data, mean)
+
+steps.interval= aggregate(steps ~ interval + day, complete.activity.data, mean)
+library(lattice)
+xyplot(steps ~ interval | factor(day), data = steps.interval, aspect = 1/2, 
+       type = "l")
+```
